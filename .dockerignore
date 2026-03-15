@@ -1,0 +1,30 @@
+# Dependencies (rebuilt inside Docker)
+node_modules
+npm-debug.log*
+
+# Next.js build output
+.next
+out
+
+# Local SQLite databases
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+data/
+
+# Environment files (use .env.example as template)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git
+.gitignore
+
+# Misc
+.DS_Store
+Thumbs.db
+*.log
+README.md
+DEPLOYMENT.md

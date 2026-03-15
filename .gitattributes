@@ -1,0 +1,7 @@
+# Force LF for shell scripts (critical for Docker on Linux)
+*.sh text eol=lf
+
+# Force LF for Dockerfile and compose files
+Dockerfile text eol=lf
+docker-compose.yml text eol=lf
+entrypoint.sh text eol=lf
