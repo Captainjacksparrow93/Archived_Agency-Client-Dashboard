@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String?   @unique
+  phone         String?   @unique
+  company       String?
+  role          String    @default("client") // client | admin | pm | employee
+  avatarUrl     String?
+  permissions   String    @default("[]") // JSON array of permission strings for PM role
+  employeeRole  String?   // Designer | Video Editor | Content Writer | Social Media Manager
+  password      String?   // hashed password for employee/admin login
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  wallet            Wallet?
+  tasks             Task[]
+  messages          Message[]
+  otpCodes          OtpCode[]
+  transactions      Transaction[]
+  assignedTasks     Task[]         @relation("AssignedPM")
+  employeeTasks     Task[]         @relation("AssignedEmployee")
+  notifications     Notification[]
+  feedbacks         TaskFeedback[]
+  changeRequests    ChangeRequest[]
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  userId    String?
+  target    String   // email or phone number
+  code      String
+  method    String   // email | sms | whatsapp
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+}
+
+model Wallet {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  balance   Float    @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Transaction {
+  id            String   @id @default(uuid())
+  userId        String
+  type          String   // credit | debit
+  amount        Float
+  description   String
+  razorpayId    String?
+  taskId        String?
+  status        String   @default("completed") // pending | completed | failed
+  createdAt     DateTime @default(now())
+
+  user          User     @relation(fields: [userId], references: [id])
+  task          Task?    @relation(fields: [taskId], references: [id])
+}
+
+model ServiceItem {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  category    String
+  price       Float
+  unit        String   @default("per piece") // per piece | per hour | per project
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskItems   TaskItem[]
+}
+
+model Task {
+  id                  String    @id @default(uuid())
+  userId              String
+  assignedPmId        String?
+  assignedEmployeeId  String?
+  title               String
+  description         String
+  status              String    @default("pending") // pending | in_progress | in_review | completed | cancelled
+  priority            String    @default("medium") // low | medium | high | urgent
+  totalCost           Float     @default(0)
+  attachments         String?   // JSON string of URLs
+  dueDate             DateTime?
+  etaHours            Float?    // Estimated hours to complete
+  etaStartedAt        DateTime? // When work actually started
+  etaExtendedBy       Float     @default(0) // Extra hours added
+  progressPct         Int       @default(0) // 0-100 progress percentage
+  feedbackCount       Int       @default(0) // Number of feedback rounds used (max 2)
+  isRetainer          Boolean   @default(false) // Monthly retainer task
+  retainerMonth       String?   // e.g. "2025-01"
+  parentTaskId        String?   // Links change requests back to original task
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  user              User            @relation(fields: [userId], references: [id])
+  assignedPm        User?           @relation("AssignedPM", fields: [assignedPmId], references: [id])
+  assignedEmployee  User?           @relation("AssignedEmployee", fields: [assignedEmployeeId], references: [id])
+  items             TaskItem[]
+  messages          Message[]
+  transactions      Transaction[]
+  feedbacks         TaskFeedback[]
+  changeRequests    ChangeRequest[]
+}
+
+model TaskItem {
+  id            String   @id @default(uuid())
+  taskId        String
+  serviceItemId String
+  quantity      Int      @default(1)
+  unitPrice     Float
+  totalPrice    Float
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  task          Task        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  serviceItem   ServiceItem @relation(fields: [serviceItemId], references: [id])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  taskId     String?
+  userId     String
+  content    String
+  sender     String   // client | agency
+  telegramId String?
+  isRead     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  task       Task?    @relation(fields: [taskId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+// Client submits feedback on a task (max 2 rounds)
+model TaskFeedback {
+  id        String   @id @default(uuid())
+  taskId    String
+  userId    String   // client who submitted
+  round     Int      // 1 or 2
+  content   String
+  createdAt DateTime @default(now())
+
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+// Client requests additional changes after 2 feedback rounds (paid)
+model ChangeRequest {
+  id          String   @id @default(uuid())
+  taskId      String
+  userId      String   // client who requested
+  title       String
+  description String
+  cost        Float
+  status      String   @default("pending") // pending | paid | in_progress | completed
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+// In-app notifications for all roles
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  type      String   // task_created | task_updated | feedback | change_request | payment
+  taskId    String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id])
+}
